@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Học 6 - Giơ Ngón Tay Chọn (Siêu Nâng Cấp)</title>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: linear-gradient(to bottom, #e0f7fa, #80deea); 
+            margin: 0; padding: 20px 0; 
+            color: #333; 
+            display: flex; 
+            justify-content: center; 
+            min-height: 100vh; 
+        }
+        #game-container { 
+            width: 95%; max-width: 1100px; 
+            background: white; 
+            border-radius: 25px; 
+            padding: 30px; 
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25); 
+            margin: 0 auto; 
+        }
+        h1 { color: #0277bd; text-align: center; font-size: 42px; margin-bottom: 30px; }
+
+        #answers-container { 
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; 
+            max-width: 880px; margin: 0 auto; 
+        }
+        .option { 
+            background: white; border: 8px solid #0277bd; border-radius: 20px; 
+            padding: 18px; font-size: 19px; font-weight: bold; 
+            min-height: 105px; 
+            display: flex; align-items: center; justify-content: center; 
+            text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.25); 
+            cursor: pointer; transition: all 0.3s; 
+        }
+        .option:hover { transform: scale(1.05); }
+        .correct { background: #c8e6c9 !important; border-color: #4caf50 !important; }
+        .wrong { background: #ffcdd2 !important; border-color: #f44336 !important; }
+
+        #upload-section { background: #f0f8ff; padding: 30px; border-radius: 20px; margin: 20px 0; border: 4px dashed #0277bd; text-align: center; }
+        button { padding: 15px 35px; font-size: 18px; border: none; border-radius: 50px; cursor: pointer; margin: 10px; font-weight: bold; }
+        #upload-btn { background: #ff9800; color: white; }
+        #start-btn { background: #0277bd; color: white; font-size: 22px; padding: 18px 60px; }
+        #parse-btn { background: #4caf50; color: white; }
+        #extracted-text { margin-top: 20px; display: none; }
+        textarea { width: 100%; height: 180px; font-size: 15px; }
+        #score { font-size: 26px; font-weight: bold; color: #ff9800; text-align: center; margin: 15px 0; }
+        #webcam-container { display: flex; justify-content: center; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+        #webcam, #output-canvas { width: 300px; height: 230px; border: 8px solid #0277bd; border-radius: 20px; }
+        #finger-status { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #d81b60; 
+            text-align: center; 
+            margin: 15px 0; 
+            min-height: 70px;
+            line-height: 1.4;
+        }
+        #question { font-size: 28px; font-weight: 600; color: #01579b; text-align: center; margin: 30px 0; }
+        #next-btn { background: #4caf50; color: white; padding: 18px 50px; font-size: 22px; border-radius: 50px; margin: 30px auto; display: none; }
+        #final { display: none; font-size: 34px; color: #4caf50; text-align: center; margin-top: 40px; }
+        .status-ok { color: #4caf50 !important; }
+        .status-warning { color: #ff9800 !important; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <h1>🎮 APP GIƠ NGÓN TAY CHỌN ĐÁP ÁN — THCS LONG HÒA</h1>
+
+        <!-- PHẦN UPLOAD -->
+        <div id="upload-section">
+            <div class="upload-box">
+                <h2>📤 Tải file Word/PDF/TXT để tự động lấy câu hỏi</h2>
+                <p><strong>Hướng dẫn:</strong><br>
+                • <strong>.txt</strong>: Tự động parse (khuyến khích dùng)<br>
+                • <strong>.pdf</strong>: Trích xuất text<br>
+                • File Word: Save As → TXT rồi tải lên</p>
+                
+                <input type="file" id="file-upload" accept=".txt,.pdf" style="margin:15px 0;">
+                <button id="upload-btn">🚀 Tải lên và phân tích</button>
+            </div>
+
+            <div id="extracted-text">
+                <h3>Text đã trích xuất từ file:</h3>
+                <textarea id="extract-textarea" placeholder="Text sẽ hiện ở đây..."></textarea>
+                <button id="parse-btn">🔄 Phân tích tự động</button>
+            </div>
+        </div>
+
+        <button id="start-btn">🚀 BẮT ĐẦU CHƠI</button>
+
+        <!-- PHẦN GAME -->
+        <div id="play-section" style="display:none;">
+            <div id="score">Điểm: 0 / <span id="total-q">0</span></div>
+            <div id="webcam-container">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="output-canvas" width="300" height="230"></canvas>
+            </div>
+            <div id="finger-status">Đang chờ tay...<br><small>Giơ tay vào khung, lòng bàn tay hướng camera</small></div>
+            <div id="question"></div>
+            <div id="answers-container">
+                <div class="option" id="opt0"></div>
+                <div class="option" id="opt1"></div>
+                <div class="option" id="opt2"></div>
+                <div class="option" id="opt3"></div>
+            </div>
+            <button id="next-btn">➡️ CÂU TIẾP THEO</button>
+            <div id="final"></div>
+        </div>
+    </div>
+
+    <script>
+        console.log("=== GAME ĐÃ SẴN SÀNG - PHIÊN BẢN TỐI ƯU NHẠY NHẤT (06/04/2026) ===");
+
+        let questions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let answered = false;
+
+        // === BIẾN ĐIỀU KHIỂN NHẬN DIỆN ===
+        let previousFingerCount = 0;
+        let fingerHoldStartTime = 0;
+        const HOLD_DURATION = 320; // ms giữ ngón để xác nhận (đã tối ưu)
+
+        const fileInput = document.getElementById('file-upload');
+        const uploadBtn = document.getElementById('upload-btn');
+        const parseBtn = document.getElementById('parse-btn');
+        const extractArea = document.getElementById('extract-textarea');
+        const extractedDiv = document.getElementById('extracted-text');
+        const startBtn = document.getElementById('start-btn');
+        const playSection = document.getElementById('play-section');
+        const uploadSection = document.getElementById('upload-section');
+
+        const questionEl = document.getElementById('question');
+        const options = [document.getElementById('opt0'), document.getElementById('opt1'), document.getElementById('opt2'), document.getElementById('opt3')];
+        const scoreEl = document.getElementById('score');
+        const totalQEl = document.getElementById('total-q');
+        const nextBtn = document.getElementById('next-btn');
+        const finalEl = document.getElementById('final');
+        const fingerCountEl = document.getElementById('finger-status');
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // ==================== UPLOAD & PARSE ====================
+        uploadBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            if (!file) { alert("Vui lòng chọn file trước!"); return; }
+            if (file.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = e => { 
+                    extractArea.value = e.target.result; 
+                    extractedDiv.style.display = 'block'; 
+                    autoParseTXT(e.target.result); 
+                };
+                reader.readAsText(file);
+            } else if (file.name.endsWith('.pdf')) {
+                const reader = new FileReader();
+                reader.onload = async e => {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        fullText += content.items.map(item => item.str).join('\n') + '\n\n';
+                    }
+                    extractArea.value = fullText;
+                    extractedDiv.style.display = 'block';
+                    alert("✅ Đã trích xuất PDF! Nhấn nút 'Phân tích tự động'");
+                };
+                reader.readAsArrayBuffer(file);
+            } else alert("Chỉ hỗ trợ .txt hoặc .pdf");
+        };
+
+        parseBtn.onclick = () => autoParseTXT(extractArea.value);
+
+        function autoParseTXT(text) {
+            const lines = text.trim().split('\n');
+            questions = [];
+            let i = 0;
+            while (i < lines.length) {
+                let q = lines[i].trim(); if (!q) { i++; continue; } i++;
+                let opts = [];
+                for (let j = 0; j < 4; j++) { if (i < lines.length) opts.push(lines[i++].trim()); }
+                let correct = -1;
+                if (i < lines.length) {
+                    const line = lines[i++].trim().toLowerCase();
+                    const match = line.match(/[abcd]/i);
+                    if (match) correct = 'abcd'.indexOf(match[0].toLowerCase());
+                }
+                if (q && opts.length === 4 && correct >= 0) {
+                    questions.push({ q, options: opts, correct });
+                }
+            }
+            alert(`✅ Đã lấy được ${questions.length} câu hỏi!`);
+            startBtn.scrollIntoView({behavior: "smooth"});
+        }
+
+        startBtn.onclick = () => {
+            if (questions.length === 0) { alert("Chưa có câu hỏi! Hãy tải file lên trước."); return; }
+            uploadSection.style.display = 'none';
+            startBtn.style.display = 'none';
+            playSection.style.display = 'block';
+            startGame();
+        };
+
+        // ==================== ÂM THANH ====================
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playCorrectSound() { 
+            for(let i=0;i<8;i++) setTimeout(()=>{let o=audioCtx.createOscillator();let g=audioCtx.createGain();o.type='sine';o.frequency.value=600+i*80;g.gain.value=0.3;o.connect(g);g.connect(audioCtx.destination);o.start();setTimeout(()=>o.stop(),100);},i*80); 
+        }
+        function playWrongSound() { 
+            let o=audioCtx.createOscillator();let g=audioCtx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(400,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(100,audioCtx.currentTime+1);g.gain.value=0.4;o.connect(g);g.connect(audioCtx.destination);o.start();setTimeout(()=>o.stop(),800); 
+        }
+
+        // ==================== MEDIA PIPE (ĐÃ TỐI ƯU MẠNH) ====================
+        let hands, camera, canvasCtx;
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('output-canvas');
+        canvasCtx = canvas.getContext('2d');
+
+        function initMediaPipe() {
+            hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 0,           // ← GIẢM ĐỂ TĂNG TỐC ĐỘ VÀ NHẠY
+                minDetectionConfidence: 0.5,  // ← GIẢM ĐỂ DỄ PHÁT HIỆN HƠN
+                minTrackingConfidence: 0.4
+            });
+            hands.onResults(onResults);
+            camera = new Camera(video, {onFrame: async () => await hands.send({image: video})});
+            camera.start();
+        }
+
+        // === HÀM ĐẾM NGÓN TAY ĐÃ ĐƯỢC CẢI TIẾN RẤT NHẠY ===
+        function getFingerCount(landmarks, handedness) {
+            let count = 0;
+
+            // 4 ngón (trỏ → út) – thêm tolerance để dễ nhận diện hơn
+            const tips = [8, 12, 16, 20];
+            const pips = [6, 10, 14, 18];
+            for (let i = 0; i < 4; i++) {
+                if (landmarks[tips[i]].y < landmarks[pips[i]].y + 0.04) count++;
+            }
+
+            // Ngón cái – ngưỡng rất thấp để nhạy
+            const thumbTipX = landmarks[4].x;
+            const thumbIPX   = landmarks[3].x;
+            let thumbExtended = false;
+
+            if (handedness === "Right") {
+                thumbExtended = thumbTipX < thumbIPX - 0.015;
+            } else {
+                thumbExtended = thumbTipX > thumbIPX + 0.015;
+            }
+            if (thumbExtended) count++;
+
+            return Math.min(count, 5);
+        }
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const lm = results.multiHandLandmarks[0];
+                const hand = results.multiHandedness[0].label;
+
+                // Vẽ landmarks
+                drawConnectors(canvasCtx, lm, Hands.HAND_CONNECTIONS, {color: '#00ff00', lineWidth: 6});
+                drawLandmarks(canvasCtx, lm, {color: '#ff0000', lineWidth: 4});
+
+                const count = getFingerCount(lm, hand);
+                const now = Date.now();
+
+                // Xử lý > 4 ngón
+                if (count > 4) {
+                    fingerCountEl.innerHTML = `${count} <span style="color:#f44336">Quá nhiều! Giơ lại 1-4 ngón</span>`;
+                    previousFingerCount = 0;
+                    fingerHoldStartTime = 0;
+                }
+                // Xử lý 1-4 ngón (có hold để tránh nhầm)
+                else if (count >= 1 && count <= 4 && !answered) {
+                    if (count === previousFingerCount) {
+                        if (fingerHoldStartTime === 0) fingerHoldStartTime = now;
+
+                        if (now - fingerHoldStartTime >= HOLD_DURATION) {
+                            handleAnswer(count - 1);
+                            previousFingerCount = 0;
+                            fingerHoldStartTime = 0;
+                            return;
+                        } else {
+                            fingerCountEl.innerHTML = `${count} <span class="status-ok">(Đang giữ...)</span>`;
+                        }
+                    } else {
+                        previousFingerCount = count;
+                        fingerHoldStartTime = now;
+                        fingerCountEl.innerHTML = `${count} <span class="status-ok">(Đang giữ...)</span>`;
+                    }
+                } 
+                else {
+                    previousFingerCount = 0;
+                    fingerHoldStartTime = 0;
+                    fingerCountEl.innerHTML = `${count} <span class="status-warning">Giơ và giữ 1-4 ngón</span>`;
+                }
+            } else {
+                // Không thấy tay
+                fingerCountEl.innerHTML = `0 <span class="status-warning">Không thấy tay<br>Giơ lòng bàn tay vào khung</span>`;
+                previousFingerCount = 0;
+                fingerHoldStartTime = 0;
+            }
+
+            canvasCtx.restore();
+        }
+
+        function handleAnswer(idx) {
+            if (answered) return;
+            answered = true;
+
+            const q = questions[currentQuestion];
+            const isCorrect = idx === q.correct;
+
+            options.forEach((o, i) => {
+                if (i === q.correct) o.classList.add('correct');
+                if (i === idx && !isCorrect) o.classList.add('wrong');
+                o.style.pointerEvents = 'none';
+            });
+
+            if (isCorrect) {
+                score++;
+                scoreEl.textContent = `Điểm: ${score} / ${questions.length}`;
+                playCorrectSound();
+            } else {
+                playWrongSound();
+            }
+
+            nextBtn.style.display = 'block';
+        }
+
+        function loadQuestion() {
+            answered = false;
+            previousFingerCount = 0;
+            fingerHoldStartTime = 0;
+            nextBtn.style.display = 'none';
+
+            const q = questions[currentQuestion];
+            questionEl.textContent = q.q;
+            options.forEach((o, i) => {
+                o.textContent = q.options[i];
+                o.classList.remove('correct', 'wrong');
+                o.style.pointerEvents = 'auto';
+            });
+        }
+
+        function startGame() {
+            currentQuestion = 0;
+            score = 0;
+            totalQEl.textContent = questions.length;
+            scoreEl.textContent = `Điểm: 0 / ${questions.length}`;
+            initMediaPipe();
+            loadQuestion();
+        }
+
+        nextBtn.addEventListener('click', () => {
+            currentQuestion++;
+            if (currentQuestion < questions.length) {
+                loadQuestion();
+            } else {
+                document.getElementById('answers-container').style.display = 'none';
+                nextBtn.style.display = 'none';
+                finalEl.style.display = 'block';
+                finalEl.innerHTML = `🎉 HOÀN THÀNH!<br>Điểm của bạn: <strong>${score}/${questions.length}</strong><br><br><button onclick="location.reload()" style="background:#0277bd;color:white;padding:18px 50px;border:none;border-radius:50px;font-size:20px;">Chơi lại</button>`;
+            }
+        });
+
+        window.onload = () => console.log("=== GAME ĐÃ TỐI ƯU HOÀN TOÀN - NHẠY & ỔN ĐỊNH ===");
+    </script>
+</body>
+</html>
